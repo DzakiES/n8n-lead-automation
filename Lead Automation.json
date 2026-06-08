@@ -1,0 +1,376 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Profile",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "What is your name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "What is your email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "What is your phone number (e.g. +1 XXXXXXXX)",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Message",
+              "fieldType": "textarea"
+            },
+            {
+              "fieldLabel": "How do you find us",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Instagram"
+                  },
+                  {
+                    "option": "Google Search"
+                  },
+                  {
+                    "option": "Linkedin Post"
+                  },
+                  {
+                    "option": "Referral from friend"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9e00670d-725f-4a48-8eb4-ba8612967458",
+      "name": "On form submission",
+      "webhookId": "4789c9e3-ce9a-4df6-8b71-a361a08fcc37"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nlet score = 1;\nconst message = (item.message || \"\").toLowerCase();\nconst source = (item.source || \"\").toLowerCase();\n\nif (message.includes(\"urgent\")) score += 3;\nif (message.includes(\"budget\")) score += 2;\nif (message.includes(\"asap\")) score += 3;\nif (message.includes(\"immediately\")) score += 2;\nif (message.includes(\"this week\")) score += 1;\nif (source === \"referral\") score += 2;\nif (source === \"instagram\") score += 1;\n\nreturn [{ json: { ...item, lead_score: score } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "29af17e3-9e86-4339-9288-0a7d04d03351",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3-flash-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a friendly and professional customer service assistant. \nYour job is to write a short, warm, and personalized email reply \nto a potential client who just submitted a contact form. \n\nRules:\n- Keep it under 100 words\n- Sound human, not robotic\n- Address their specific need based on their message\n- Do not make up prices or promises\n- End with \"Talk soon,\" and a new line then write \"The Team\"\n- Do not include a subject line, just the email body\n\nWrite a personalized email reply for this lead:\n\nName: {{ $json['What is your name'] }}\nMessage: {{ $json['Message'] }}\nSource: {{ $json['How do you find us'] }}\n\nWrite the reply directly, starting with \"Hi [their name],\" "
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "20a3c8eb-02db-4d88-aba2-2ca727273a87",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "4J1qr684cMXhlTb0",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript').item.json['What is your email'] }}",
+        "subject": "=Thank you for reaching out, {{ $('Code in JavaScript').item.json['What is your email'] }}!",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; padding: 20px; color: #333;\">\n\n  {{ $json.content.parts[0].text }}\n\n  <br><br>\n  <hr style=\"border: none; border-top: 1px solid #eee; margin: 20px 0;\">\n  <p style=\"font-size: 12px; color: #999;\">\n    This email was sent automatically. Feel free to reply directly to this email.\n  </p>\n\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "f76fd8c1-afc4-4d4c-9763-2e511ccf66f8",
+      "name": "Send a message",
+      "webhookId": "9967682f-f746-45f9-bf3e-caf84463e431",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "stc3PjRnshFPX2ht",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f113066b-b541-45a3-bb20-571de898aee1",
+              "leftValue": "={{ $json.lead_score }}",
+              "rightValue": 4,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        -224
+      ],
+      "id": "609229d4-8060-4432-94d5-73120bfaf1d3",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "-1003837921483",
+        "text": "=HIGH PRIORITY LEAD ALERT |  {{ $('Code in JavaScript').item.json['What is your email'] }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        704,
+        -240
+      ],
+      "id": "ee9961e0-3f2c-44dd-ad9f-f6ee9486408a",
+      "name": "Send a text message",
+      "webhookId": "9937fa3d-50f4-455c-bd11-124be5b74ee7",
+      "credentials": {
+        "telegramApi": {
+          "id": "bz8RxrUctporEInx",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "13NpghP73L0OTGA4WbtyOII7L6VQOcgvsd-b-4rjsU-Q",
+          "mode": "list",
+          "cachedResultName": "CRM Test",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/13NpghP73L0OTGA4WbtyOII7L6VQOcgvsd-b-4rjsU-Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/13NpghP73L0OTGA4WbtyOII7L6VQOcgvsd-b-4rjsU-Q/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json['What is your name'] }}",
+            "Email": "={{ $json['What is your email'] }}",
+            "Phone number": "={{ $json['What is your phone number (e.g. +1 XXXXXXXX)'] }}",
+            "Message": "={{ $json.Message }}",
+            "Source": "={{ $json['How do you find us'] }}",
+            "Score": "={{ $json.lead_score }}",
+            "Timestamp": "={{ $json.submittedAt }}",
+            "Status": "New"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone number",
+              "displayName": "Phone number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        480,
+        240
+      ],
+      "id": "c626c178-8ed1-49fd-bcf4-cd1e379f6828",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "k7oTgOHYe6zh7tpg",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "be818f65-2983-49d1-a66e-572900cd9fb9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "933a06c2b111f542b51e9a7b9c8e2732e01499649d8a620b94eac921169f384d"
+  },
+  "id": "82seKdAVE5XD83bd",
+  "tags": []
+}
